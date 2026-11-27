@@ -1,0 +1,101 @@
+name: PR title check
+
+on:
+  pull_request:
+   
+ types: [opened, synchronize, reopened, edite
+d]
+    branches:
+      - main
+
+concurrency:
+ 
+ group: pr-title-${{ github.event.pull_reques
+t.number }}
+  cancel-in-progress: true
+
+permi
+ssions:
+  contents: read
+
+jobs:
+  title:
+    
+runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        us
+es: actions/checkout@v4
+        with:
+       
+   fetch-depth: 0
+
+      - name: A fix needs 
+a test
+        env:
+          PR_TITLE: ${{ g
+ithub.event.pull_request.title }}
+          B
+ASE_REF: ${{ github.base_ref }}
+        run: 
+|
+          node -e '
+            const { exe
+cFileSync } = require("node:child_process");
+
+            const title = (process.env.PR_TIT
+LE || "").trim();
+            if (!/^fix(?:\(
+|:)/i.test(title)) {
+              console.lo
+g(`pr-title ok: "${title}" is not fix( or fix
+:; test file check skipped`);
+              p
+rocess.exit(0);
+            }
+            con
+st out = execFileSync("git", ["diff", "--name
+-status", "--no-renames", "-z", `origin/${pro
+cess.env.BASE_REF}...HEAD`], { encoding: "utf
+8" });
+            const fields = out.split("
+\0");
+            const isTest = (p) =>
+     
+         /(^|\/)test_[^/]*\.py$/.test(p) ||
+ 
+             /[^/]+\.(?:test|spec)\.[cm]?[jt]
+sx?$/.test(p) ||
+              /(^|\/)(?:test
+s|__tests__|test)\/.+/.test(p) ||
+           
+   /_test\.dart$/.test(p) ||
+              /(
+?:Test|Spec)\.(?:kt|java)$/.test(p);
+        
+    for (let i = 0; i + 1 < fields.length; i 
++= 2) {
+              const st = fields[i].tr
+im().charAt(0);
+              const fp = fiel
+ds[i + 1];
+              if (fp && (st === "A
+" || st === "M" || st === "T") && isTest(fp))
+ {
+                console.log(`pr-title ok: 
+fix PR includes test file ${fp}`);
+          
+      process.exit(0);
+              }
+      
+      }
+            console.error(`FAIL: PR t
+itle "${title}" starts with fix( or fix: but 
+adds or modifies no test file.`);
+           
+ process.exit(1);
+          '
+
+
